@@ -1,0 +1,10 @@
+pandas
+numpy
+scikit-learn
+Sastrawi
+streamlit
+fastapi
+uvicorn
+kagglehub
+matplotlib
+seaborn
