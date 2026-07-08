@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+streamlit
+scikit-learn
+pandas
+numpy
+Sastrawi
+python-multipart
+httpx
+kaggle
