@@ -1,101 +1,136 @@
+import os
 import pandas as pd
 import numpy as np
+import pickle
+import time
+from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.svm import SVC
-from sklearn.pipeline import Pipeline
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
-import pickle
-import os
-import glob
-from preprocess import preprocess_pipeline
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
-def train_model():
-    data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "raw")
-    models_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models")
-    os.makedirs(models_dir, exist_ok=True)
+from preprocess import TextPreprocessor, save_preprocessor
 
-    # Temukan file csv di data/raw
-    csv_files = glob.glob(os.path.join(data_dir, "*.csv"))
-    if not csv_files:
-        print("Data CSV tidak ditemukan di data/raw. Harap download dataset Kaggle dan ekstrak ke sana.")
-        # Buat dummy data jika tidak ada (untuk memastikan pipeline berjalan)
-        print("Membuat synthetic dummy data untuk keperluan pengujian pipeline...")
-        df = pd.DataFrame({
-            'text': ["Barangnya bagus banget", "Pengiriman cepat, seller ramah", "Barang rusak, sangat mengecewakan", "Biasa saja, sesuai harga", "Tidak direkomendasikan, pengiriman lambat", "Cukup untuk sementara", "Standar, tidak ada yang spesial"],
-            'label': ["Low Cortisol", "Low Cortisol", "High Cortisol", "No Cortisol", "High Cortisol", "No Cortisol", "No Cortisol"]
-        })
+def map_score_to_sentiment(score):
+    if score in [4, 5]:
+        return 'Positive'
+    elif score == 3:
+        return 'Neutral'
     else:
-        # Gunakan csv pertama yang ditemukan
-        print(f"Membaca dataset dari {csv_files[0]}")
-        df = pd.read_csv(csv_files[0])
-        # Coba deteksi kolom teks dan label
-        text_cols = [c for c in df.columns if 'text' in c.lower() or 'review' in c.lower()]
-        label_cols = [c for c in df.columns if 'label' in c.lower() or 'sentiment' in c.lower() or 'rating' in c.lower()]
+        return 'Negative'
+
+def main():
+    print("=== Sentiment Analysis SVM Training Pipeline ===")
+    
+    # Define paths
+    data_dir = r"c:\git\UAS-AI\Analisis-Sentimen-Marketplace-Nasional\data"
+    models_dir = r"c:\git\UAS-AI\Analisis-Sentimen-Marketplace-Nasional\models"
+    os.makedirs(models_dir, exist_ok=True)
+    
+    csv_path = os.path.join(data_dir, "Shopee_Sampled_Reviews.csv")
+    preprocessed_csv_path = os.path.join(data_dir, "preprocessed_reviews.csv")
+    
+    # 1. Load Data
+    print(f"Loading raw data from: {csv_path}")
+    df = pd.read_csv(csv_path)
+    
+    # Map score to sentiment
+    df['sentiment'] = df['score'].apply(map_score_to_sentiment)
+    print("Class distribution after mapping:")
+    print(df['sentiment'].value_counts())
+    
+    # Initialize Preprocessor
+    preprocessor = TextPreprocessor(use_stemmer=True)
+    
+    # 2. Preprocess or Load Preprocessed Data
+    if os.path.exists(preprocessed_csv_path):
+        print(f"Preprocessed data found at {preprocessed_csv_path}. Loading cached version...")
+        df_processed = pd.read_csv(preprocessed_csv_path)
+        # Ensure we fill NaN in case any review was completely cleaned to empty
+        df_processed['clean_content'] = df_processed['clean_content'].fillna("")
+    else:
+        print("Preprocessed data not found. Running prapemrosesan pipeline (this may take 1-2 minutes)...")
+        start_time = time.time()
         
-        if text_cols and label_cols:
-            df = df.rename(columns={text_cols[0]: 'text', label_cols[0]: 'label'})
-        else:
-            print("Peringatan: Tidak dapat mendeteksi kolom text dan label secara otomatis. Menggunakan 2 kolom pertama.")
-            df = df.rename(columns={df.columns[0]: 'text', df.columns[1]: 'label'})
-            
-        # Drop missing values
-        df = df.dropna(subset=['text', 'label'])
+        # Run parallel preprocessing
+        cleaned_texts = preprocessor.preprocess_parallel(df['content'].tolist(), n_jobs=4)
         
-        # Mapping kelas sentimen ke: Low Cortisol (Positif), High Cortisol (Negatif), No Cortisol (Netral)
-        if df['label'].dtype == 'object' or isinstance(df['label'].iloc[0], str):
-            df['label'] = df['label'].astype(str).str.lower()
-            conditions = [
-                df['label'].str.contains('pos|1|baik|bagus'),
-                df['label'].str.contains('neg|0|jelek|buruk|rusak|kecewa')
-            ]
-            choices = ['Low Cortisol', 'High Cortisol']
-            df['label'] = np.select(conditions, choices, default='No Cortisol')
-        else:
-            # Jika dataset memiliki rating numerik (misal 1-5)
-            conditions = [
-                df['label'] >= 4,
-                df['label'] <= 2
-            ]
-            choices = ['Low Cortisol', 'High Cortisol']
-            df['label'] = np.select(conditions, choices, default='No Cortisol')
-            
-    print(f"Total data: {len(df)}")
-    print("Distribusi Kelas:")
-    print(df['label'].value_counts())
+        df['clean_content'] = cleaned_texts
+        df_processed = df[['reviewId', 'content', 'clean_content', 'score', 'sentiment']]
+        
+        # Save to csv for future runs
+        df_processed.to_csv(preprocessed_csv_path, index=False)
+        print(f"Prapemrosesan selesai dalam {time.time() - start_time:.2f} detik. Saved to: {preprocessed_csv_path}")
     
-    # Preprocessing
-    print("Memulai preprocessing (Sastrawi Stemming dll)...")
-    X = preprocess_pipeline(df['text'].tolist())
-    y = df['label'].values
+    # 3. Train-Test Split
+    X = df_processed['clean_content']
+    y = df_processed['sentiment']
     
-    # Split data
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
     
-    # Pipeline: TF-IDF + SVM
-    print("Melatih model SVM dengan TF-IDF (3 Kelas)...")
-    pipeline = Pipeline([
-        ('tfidf', TfidfVectorizer(max_features=5000)),
-        ('svm', SVC(kernel='linear', probability=True, random_state=42))
-    ])
+    print(f"Training size: {len(X_train)}, Testing size: {len(X_test)}")
     
-    pipeline.fit(X_train, y_train)
+    # 4. Feature Extraction: TF-IDF
+    print("Extracting features using TF-IDF Vectorizer...")
+    vectorizer = TfidfVectorizer(max_features=5000, ngram_range=(1, 2))
+    X_train_tfidf = vectorizer.fit_transform(X_train)
+    X_test_tfidf = vectorizer.transform(X_test)
     
-    # Evaluasi
-    y_pred = pipeline.predict(X_test)
-    print("\n--- Hasil Evaluasi ---")
-    print(f"Accuracy:  {accuracy_score(y_test, y_pred):.4f}")
-    # Menggunakan macro avg untuk multiclass classification
-    print(f"Precision (Macro): {precision_score(y_test, y_pred, average='macro', zero_division=0):.4f}")
-    print(f"Recall (Macro):    {recall_score(y_test, y_pred, average='macro', zero_division=0):.4f}")
-    print(f"F1-Score (Macro):  {f1_score(y_test, y_pred, average='macro', zero_division=0):.4f}")
-    print("\nClassification Report:\n", classification_report(y_test, y_pred, zero_division=0))
+    # 5. Model Training: Support Vector Machine (SVM)
+    print("Training Support Vector Machine (SVM) classifier...")
+    svm_start = time.time()
+    # SVC probability=True allows prediction probability scores
+    model = SVC(kernel='linear', C=1.0, probability=True, random_state=42)
+    model.fit(X_train_tfidf, y_train)
+    print(f"SVM training completed in {time.time() - svm_start:.2f} seconds.")
     
-    # Export Model
-    model_path = os.path.join(models_dir, "svm_tfidf_pipeline.pkl")
+    # 6. Evaluation
+    y_pred = model.predict(X_test_tfidf)
+    accuracy = accuracy_score(y_test, y_pred)
+    report = classification_report(y_test, y_pred, output_dict=True)
+    conf_matrix = confusion_matrix(y_test, y_pred, labels=['Negative', 'Neutral', 'Positive'])
+    
+    print("\n" + "="*40)
+    print(f"Model Accuracy: {accuracy * 100:.2f}%")
+    print("="*40)
+    print("Classification Report:")
+    print(classification_report(y_test, y_pred))
+    print("Confusion Matrix:")
+    print(conf_matrix)
+    print("="*40 + "\n")
+    
+    # 7. Save Models and Objects
+    vectorizer_path = os.path.join(models_dir, "tfidf_vectorizer.pkl")
+    model_path = os.path.join(models_dir, "svm_model.pkl")
+    metrics_path = os.path.join(models_dir, "evaluation_metrics.pkl")
+    preprocessor_path = os.path.join(models_dir, "preprocessor.pkl")
+    
+    print(f"Saving TF-IDF Vectorizer to: {vectorizer_path}")
+    with open(vectorizer_path, 'wb') as f:
+        pickle.dump(vectorizer, f)
+        
+    print(f"Saving SVM Model to: {model_path}")
     with open(model_path, 'wb') as f:
-        pickle.dump(pipeline, f)
-    print(f"Model berhasil disimpan di {model_path}")
+        pickle.dump(model, f)
+        
+    # Save training metrics for app display
+    metrics = {
+        'accuracy': accuracy,
+        'classification_report': report,
+        'confusion_matrix': conf_matrix.tolist(),
+        'test_samples': len(X_test),
+        'train_samples': len(X_train),
+        'class_distribution': df_processed['sentiment'].value_counts().to_dict()
+    }
+    print(f"Saving evaluation metrics to: {metrics_path}")
+    with open(metrics_path, 'wb') as f:
+        pickle.dump(metrics, f)
+        
+    print(f"Saving Preprocessor instance to: {preprocessor_path}")
+    save_preprocessor(preprocessor, preprocessor_path)
+    
+    print("Training pipeline finished successfully!")
 
 if __name__ == "__main__":
-    train_model()
+    main()

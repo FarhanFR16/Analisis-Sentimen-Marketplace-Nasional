@@ -1,10 +1,10 @@
-fastapi
-uvicorn
-streamlit
-scikit-learn
 pandas
 numpy
+scikit-learn
 Sastrawi
-python-multipart
-httpx
-kaggle
+streamlit
+fastapi
+uvicorn
+kagglehub
+matplotlib
+seaborn

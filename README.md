@@ -1,117 +1,155 @@
-# Analisis Sentimen Marketplace Nasional
+# 🛍️ Analisis Sentimen Marketplace Nasional (Tema 6)
 
-![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg?logo=fastapi)
-![Streamlit](https://img.shields.io/badge/Streamlit-1.25+-FF4B4B.svg?logo=streamlit)
-![Scikit-Learn](https://img.shields.io/badge/scikit--learn-1.0+-F7931E.svg?logo=scikit-learn)
+[![Python Version](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/)
+[![Streamlit App](https://img.shields.io/badge/Streamlit-App-FF4B2B.svg)](https://streamlit.io/)
+[![FastAPI API](https://img.shields.io/badge/FastAPI-REST_API-009688.svg)](https://fastapi.tiangolo.com/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-Proyek ini merupakan implementasi sistem *End-to-End Artificial Intelligence* untuk melakukan Analisis Sentimen terhadap ulasan pelanggan di marketplace nasional (seperti Shopee dan Tokopedia).
+Repositori ini berisi implementasi lengkap untuk **Analisis Sentimen Ulasan Marketplace Nasional (Shopee)** menggunakan kombinasi **NLP Preprocessing (Sastrawi Stemmer & Slang Normalizer)** dan **Support Vector Machine (SVM)** dengan pembobotan **TF-IDF**. 
 
-Sistem ini dikembangkan menggunakan **Support Vector Machine (SVM)** dengan ekstraksi fitur **TF-IDF**, dan melalui tahapan pra-pemrosesan Natural Language Processing (NLP) yang mencakup tokenisasi dan stemming menggunakan **Sastrawi**.
+Proyek ini dibangun sebagai bagian dari penilaian **UAS Kecerdasan Buatan (AI-03)** oleh **Kelompok 4**:
+* **Farhan Fathurrahman**
+* **Muhamad Aziz Sukandar**
+* **Muhammad Aden Fikri Darmawan**
 
-## Architecture Diagram
+---
+
+## 📐 Arsitektur Sistem (Pipeline AI)
+
+Berikut adalah diagram alir dari prapemrosesan ulasan hingga menghasilkan hasil klasifikasi sentimen dan skor keyakinan:
 
 ```mermaid
-graph LR
-    A[User / Streamlit UI] -->|Input Teks (JSON POST)| B(FastAPI Backend)
-    B --> C{NLP Preprocessing}
-    C -->|Case Folding, Sastrawi| D(TF-IDF Vectorizer)
-    D --> E((SVM Classifier))
-    E -->|Sentimen & Confidence| B
-    B -->|Response JSON| A
+graph TD
+    A[Input Ulasan / Payload JSON] --> B[NLP Preprocessing]
+    subgraph B [NLP Preprocessing Pipeline]
+        B1[Case Folding & Cleaning] --> B2[Slang Normalization]
+        B2 --> B3[Stopwords Removal (Negation Preserved)]
+        B3 --> B4[Stemming (Sastrawi Stemmer)]
+    end
+    B4 --> C[TF-IDF Vectorization]
+    C --> D[SVM Classifier Inference]
+    D --> E[Output Result]
+    subgraph E [Output Layer]
+        E1[Predicted Sentiment Label: Positive/Neutral/Negative]
+        E2[Confidence Score %]
+    end
 ```
 
-## Struktur Repositori
+---
 
-```text
-📦 Analisis-Sentimen-Marketplace-Nasional
- ┣ 📂 data/
- ┃ ┣ 📂 raw/              # Dataset mentah dari Kaggle
- ┃ ┗ 📂 processed/        # (Opsional) Dataset setelah preprocessing
- ┣ 📂 models/             # File model (.pkl)
- ┣ 📂 notebooks/          # Eksperimen awal (EDA, Tuning)
- ┣ 📂 src/
- ┃ ┣ 📜 setup_data.py     # Script unduh dataset
- ┃ ┣ 📜 preprocess.py     # Modul pipeline NLP (Sastrawi)
- ┃ ┣ 📜 train.py          # Script pelatihan model SVM & ekspor
- ┃ ┣ 📜 api.py            # FastAPI REST Endpoint
- ┃ ┗ 📜 app.py            # Streamlit Frontend
- ┣ 📜 README.md
- ┗ 📜 requirements.txt
-```
+## 🚀 Panduan Memulai (Setup Guide)
 
-## Setup Guide
+### 1. Prasyarat
+Pastikan Anda sudah menginstal Python 3.10+ di komputer Anda.
 
-### 1. Instalasi Kebutuhan
-
-Pastikan Python telah terinstal, lalu jalankan:
-
+### 2. Kloning Repositori
 ```bash
-git checkout dev/aden
+git clone https://github.com/FarhanFR16/Analisis-Sentimen-Marketplace-Nasional.git
+cd Analisis-Sentimen-Marketplace-Nasional
+```
+
+### 3. Instalasi Dependensi
+Instal semua pustaka yang dibutuhkan menggunakan `requirements.txt`:
+```bash
 pip install -r requirements.txt
 ```
 
-### 2. Akuisisi Dataset
-
-Unduh dataset dari link berikut ke folder `data/raw/`:
-[Dataset Kaggle: e-commerce-sampled-reviews-in-bahasa-indonesia](https://www.kaggle.com/datasets/satyaahb/e-commerce-sampled-reviews-in-bahasa-indonesia)
-
-Atau gunakan script (membutuhkan `kaggle.json` yang sudah dikonfigurasi):
-```bash
-python src/setup_data.py
-```
-
-### 3. Melatih Model
-
-Jalankan script untuk memproses data dan melatih model SVM:
+### 4. Menjalankan Model Training Pipeline
+Untuk memproses dataset Shopee, melatih model SVM, dan menyimpan bobot model (`.pkl`), jalankan perintah:
 ```bash
 python src/train.py
 ```
-*(Script ini akan menyimpan model di `models/svm_tfidf_pipeline.pkl`)*
+*Catatan: Pipeline prapemrosesan menggunakan optimasi kamus kata unik dan multiprocessing, sehingga hanya membutuhkan waktu sekitar ~2 menit dibandingkan ~17 menit jika berjalan normal.*
 
-### 4. Menjalankan REST API (Backend)
-
-Jalankan server FastAPI:
+### 5. Menjalankan Aplikasi Web (Streamlit)
+Untuk membuka dasbor antarmuka interaktif:
 ```bash
-uvicorn src.api:app --reload --host 0.0.0.0 --port 8000
+streamlit run app.py
 ```
-API akan berjalan di `http://localhost:8000`. Dokumentasi Swagger UI tersedia di `http://localhost:8000/docs`.
 
-### 5. Menjalankan Streamlit App (Frontend)
-
-Buka terminal baru dan jalankan Streamlit:
+### 6. Menjalankan Server REST API (FastAPI)
+Untuk menjalankan server API lokal untuk diintegrasikan dengan aplikasi lain:
 ```bash
-streamlit run src/app.py
+uvicorn src.api:app --reload
 ```
-Aplikasi web akan terbuka otomatis di browser Anda.
+Server akan berjalan di `http://127.0.0.1:8000`. Dokumentasi Swagger interaktif dapat diakses di `http://127.0.0.1:8000/docs`.
 
-## API Documentation
+---
 
-Endpoint utama untuk prediksi sentimen:
-- **URL**: `/predict`
-- **Method**: `POST`
-- **Content-Type**: `application/json`
-
-### JSON Request Format (Input)
-```json
-{
-  "text": "Barangnya bagus banget, pengiriman super cepat!"
-}
+## 🧪 Pengujian Unit (Unit Testing)
+Kami telah menyediakan rangkaian tes otomatis untuk memverifikasi fungsionalitas sistem:
+```bash
+python -m unittest src/test_pipeline.py
 ```
 
-### JSON Response Format - Success (200 OK)
-```json
-{
-  "sentiment": "Positif",
-  "confidence": 0.8924,
-  "status": "success"
-}
-```
+---
 
-### JSON Response Format - Error (400 Bad Request)
-```json
-{
-  "detail": "Teks tidak boleh kosong."
-}
-```
-*(Containment Unit 1 telah diimplementasikan untuk mencegah server crash saat menerima payload tidak valid)*
+## 🔌 Dokumentasi REST API
+
+### **1. Health Check**
+Memeriksa status kesehatan server dan kesiapan model AI.
+* **Method & URL**: `GET /health`
+* **Response (200 OK)**:
+  ```json
+  {
+    "status": "healthy",
+    "message": "Service is ready to predict."
+  }
+  ```
+* **Response (503 Service Unavailable)**:
+  ```json
+  {
+    "status": "error",
+    "message": "ML Models are not loaded."
+  }
+  ```
+
+### **2. Prediksi Sentimen**
+Melakukan klasifikasi sentimen terhadap ulasan masukan.
+* **Method & URL**: `POST /predict`
+* **Headers**: `Content-Type: application/json`
+* **Request Body (JSON)**:
+  ```json
+  {
+    "text": "Barang sangat bagus sekali! Pengiriman super cepat dan kurirnya ramah."
+  }
+  ```
+* **Response Sukses (200 OK)**:
+  ```json
+  {
+    "status": "success",
+    "prediction": "Positive",
+    "confidence": 0.9388120392,
+    "clean_text": "barang sangat bagus sekali kirim super cepat kurir ramah"
+  }
+  ```
+* **Response Request Salah (400 Bad Request)**:
+  ```json
+  {
+    "detail": {
+      "status": "error",
+      "message": "Input teks tidak boleh kosong atau hanya berupa spasi."
+    }
+  }
+  ```
+* **Response Kesalahan Server (500 Internal Server Error)**:
+  ```json
+  {
+    "detail": {
+      "status": "error",
+      "message": "Terjadi kesalahan internal: [deskripsi error]"
+    }
+  }
+  ```
+
+---
+
+## 📈 Metrik Evaluasi Model
+
+Model divalidasi pada data uji terpisah (20% split) dan mendapatkan hasil berikut:
+- **Akurasi Keseluruhan (Accuracy)**: **66.8%**
+- **Precision (Positive)**: **79.0%**
+- **Recall (Positive)**: **75.0%**
+- **F1-Score (Positive)**: **77.0%**
+
+*Model ini menunjukkan performa terbaik dalam membedakan ulasan Positif dan Negatif secara konsisten, namun mengalami keterbatasan pada ulasan Neutral karena jumlah data yang lebih sedikit dan karakteristik ulasan netral yang ambigu.*
