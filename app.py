@@ -89,7 +89,8 @@ st.markdown("""
 # ----------------------------------------------------
 @st.cache_resource
 def load_ml_components():
-    models_dir = r"c:\git\UAS-AI\Analisis-Sentimen-Marketplace-Nasional\models"
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    models_dir = os.path.join(base_dir, "models")
     vectorizer_path = os.path.join(models_dir, "tfidf_vectorizer.pkl")
     model_path = os.path.join(models_dir, "svm_model.pkl")
     preprocessor_path = os.path.join(models_dir, "preprocessor.pkl")

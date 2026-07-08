@@ -17,7 +17,8 @@ class TestSentimentPipeline(unittest.TestCase):
         cls.client = TestClient(app)
         
         # Load vectorizer and model to verify they exist
-        models_dir = r"c:\git\UAS-AI\Analisis-Sentimen-Marketplace-Nasional\models"
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        models_dir = os.path.join(base_dir, "models")
         cls.vectorizer_path = os.path.join(models_dir, "tfidf_vectorizer.pkl")
         cls.model_path = os.path.join(models_dir, "svm_model.pkl")
 

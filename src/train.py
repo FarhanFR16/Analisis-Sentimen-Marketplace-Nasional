@@ -21,9 +21,9 @@ def map_score_to_sentiment(score):
 def main():
     print("=== Sentiment Analysis SVM Training Pipeline ===")
     
-    # Define paths
-    data_dir = r"c:\git\UAS-AI\Analisis-Sentimen-Marketplace-Nasional\data"
-    models_dir = r"c:\git\UAS-AI\Analisis-Sentimen-Marketplace-Nasional\models"
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    data_dir = os.path.join(base_dir, "data")
+    models_dir = os.path.join(base_dir, "models")
     os.makedirs(models_dir, exist_ok=True)
     
     csv_path = os.path.join(data_dir, "Shopee_Sampled_Reviews.csv")

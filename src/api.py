@@ -19,7 +19,8 @@ model = None
 vectorizer = None
 preprocessor = None
 
-MODELS_DIR = r"c:\git\UAS-AI\Analisis-Sentimen-Marketplace-Nasional\models"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODELS_DIR = os.path.join(BASE_DIR, "models")
 
 # ----------------------------------------------------
 # Request and Response Models
