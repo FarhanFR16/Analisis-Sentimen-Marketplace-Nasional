@@ -49,7 +49,7 @@ if submitted:
                             st.metric(label="Prediksi Sentimen", value=f"😊 {sentiment} (Positif)")
                         elif sentiment == "High Cortisol":
                             st.metric(label="Prediksi Sentimen", value=f"😠 {sentiment} (Negatif)")
-                        elif sentiment == "No Cortisol":
+                        elif sentiment == "Medium Cortisol":
                             st.metric(label="Prediksi Sentimen", value=f"😐 {sentiment} (Netral)")
                         else:
                             st.metric(label="Prediksi Sentimen", value=f"{sentiment}")
