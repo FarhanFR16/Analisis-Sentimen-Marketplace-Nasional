@@ -21,7 +21,8 @@ INDONESIAN_STOPWORDS = {
     'begitupun', 'begitulah', 'bila', 'bilamana', 'demikian', 'demikianlah',
     'ia', 'ialah', 'kami', 'kamu', 'saya', 'dia', 'mereka', 'kita', 'anda',
     'kalian', 'kita', 'tahu', 'tahu-tahu', 'tahunya', 'tentu', 'tentunya',
-    'tersebut', 'tersebutlah', 'tentang', 'tentang-tentang'
+    'tersebut', 'tersebutlah', 'tentang', 'tentang-tentang',
+    'sangat', 'sekali', 'banget', 'benar', 'terlalu', 'amat', 'pol'
 } - NEGATION_WORDS
 
 # Common Marketplace Slang & Abbreviation Normalization Dictionary
@@ -208,3 +209,46 @@ def _stem_chunk_helper(word_chunk):
     factory = StemmerFactory()
     local_stemmer = factory.create_stemmer()
     return {word: local_stemmer.stem(word) for word in word_chunk}
+
+def refine_sentiment(text, predicted_sentiment, confidence):
+    """
+    Refines the SVM prediction using rule-based heuristics for negations and sarcasm.
+    """
+    text_lower = text.lower()
+    
+    # Negation words
+    negations = ['tidak', 'ga', 'gak', 'gk', 'kurang', 'belum', 'enggak', 'kagak', 'ndak']
+    
+    # Positive target words (stemmed or common base words)
+    positives = [
+        'bagus', 'membantu', 'bantu', 'puas', 'mantap', 'oke', 'ok', 'original', 'ori', 
+        'cepat', 'cpt', 'cocok', 'sesuai', 'rekomendasi', 'recommended', 'recomended', 
+        'suka', 'senang', 'bermanfaat', 'berguna', 'berfungsi', 'nyala', 'aktif'
+    ]
+    
+    # 1. Rule 1: Negation of positive concepts -> Override to Negative
+    words = text_lower.split()
+    for i in range(len(words)):
+        if words[i] in negations:
+            # Check the next 2 words
+            for j in range(i + 1, min(i + 3, len(words))):
+                # Clean word for comparison (remove non-alphabetic)
+                word_clean = re.sub(r'[^a-z]', '', words[j])
+                if any(pos == word_clean or word_clean.startswith(pos) for pos in positives):
+                    return 'Negative', 0.92, True, f"Negasi terdeteksi ('{words[i]} {words[j]}')"
+                    
+    # 2. Rule 2: Sarcasm/Contradiction (Positive words mixed with strong negative event keywords)
+    sarcasm_pos = ['bagus', 'mantap', 'oke', 'ok', 'mulus', 'cantik', 'indah', 'recommended']
+    sarcasm_neg = [
+        'mati total', 'mati', 'rusak', 'pecah', 'cacat', 'kecewa', 'nyesel', 'menyesal', 
+        'penipu', 'palsu', 'bohong', 'tipu', 'sampah', 'parah', 'retak', 'penyesalan', 
+        'kecewaa', 'bohongg'
+    ]
+    
+    has_pos = any(pos in text_lower for pos in sarcasm_pos)
+    has_neg_event = any(neg in text_lower for neg in sarcasm_neg)
+    
+    if has_pos and has_neg_event:
+        return 'Negative', 0.88, True, "Kontradiksi/Sarkasme terdeteksi (kata positif dicampur dengan kendala produk)"
+        
+    return predicted_sentiment, confidence, False, ""

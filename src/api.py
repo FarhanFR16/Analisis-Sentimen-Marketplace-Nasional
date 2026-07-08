@@ -6,7 +6,7 @@ import sys
 
 # Add src to python path
 sys.path.append(os.path.dirname(__file__))
-from preprocess import TextPreprocessor, load_preprocessor
+from preprocess import TextPreprocessor, load_preprocessor, refine_sentiment
 
 app = FastAPI(
     title="Sentiment Analysis API",
@@ -120,12 +120,17 @@ def predict_sentiment(request: SentimentRequest):
             
         # 3. Vectorization & Inference
         tfidf_feats = vectorizer.transform([clean_txt])
-        prediction = model.predict(tfidf_feats)[0]
+        pred_class_raw = model.predict(tfidf_feats)[0]
         
         # Calculate confidence score
         probabilities = model.predict_proba(tfidf_feats)[0]
-        class_idx = list(model.classes_).index(prediction)
-        confidence = float(probabilities[class_idx])
+        class_idx = list(model.classes_).index(pred_class_raw)
+        confidence_raw = float(probabilities[class_idx])
+        
+        # Refine prediction based on negation and sarcasm rules
+        prediction, confidence, _, _ = refine_sentiment(
+            request.text, pred_class_raw, confidence_raw
+        )
         
         return {
             "status": "success",
