@@ -147,9 +147,9 @@ Melakukan klasifikasi sentimen terhadap ulasan masukan.
 ## 📈 Metrik Evaluasi Model
 
 Model divalidasi pada data uji terpisah (20% split) dan mendapatkan hasil berikut:
-- **Akurasi Keseluruhan (Accuracy)**: **66.8%**
-- **Precision (Positive)**: **79.0%**
-- **Recall (Positive)**: **75.0%**
+- **Akurasi Keseluruhan (Accuracy)**: **67.2%**
+- **Precision (Positive)**: **78.0%**
+- **Recall (Positive)**: **76.0%**
 - **F1-Score (Positive)**: **77.0%**
 
 *Model ini menunjukkan performa terbaik dalam membedakan ulasan Positif dan Negatif secara konsisten, namun mengalami keterbatasan pada ulasan Neutral karena jumlah data yang lebih sedikit dan karakteristik ulasan netral yang ambigu.*

@@ -10,7 +10,7 @@ import seaborn as sns
 # Adjust import path
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
-from src.preprocess import TextPreprocessor, load_preprocessor, SLANG_DICT
+from src.preprocess import TextPreprocessor, load_preprocessor, SLANG_DICT, refine_sentiment
 
 # ----------------------------------------------------
 # 1. PAGE CONFIGURATION & STYLING
@@ -161,8 +161,8 @@ with st.sidebar:
 # ----------------------------------------------------
 # 5. MAIN CONTENT
 # ----------------------------------------------------
-st.markdown("<div class='main-title'>Analisis Sentimen Ulasan Marketplace</div>", unsafe_allow_html=True)
-st.markdown("<div class='sub-title'>Klasifikasi Sentimen Ulasan Menggunakan Pipeline NLP Sastrawi & Support Vector Machine (SVM)</div>", unsafe_allow_html=True)
+st.markdown("<div class='main-title'>Analisis Sentimen & Tingkat Cortisol</div>", unsafe_allow_html=True)
+st.markdown("<div class='sub-title'>Klasifikasi Sentimen Ulasan (Low vs High Cortisol) Menggunakan Pipeline NLP Sastrawi & Support Vector Machine (SVM)</div>", unsafe_allow_html=True)
 
 if err_msg:
     st.error(err_msg)
@@ -214,31 +214,59 @@ else:
                             tfidf_feats = vectorizer.transform([final_text])
                             
                             # Predict
-                            pred_class = model.predict(tfidf_feats)[0]
+                            pred_class_raw = model.predict(tfidf_feats)[0]
                             pred_probs = model.predict_proba(tfidf_feats)[0]
-                            class_idx = list(model.classes_).index(pred_class)
-                            confidence = pred_probs[class_idx]
+                            class_idx = list(model.classes_).index(pred_class_raw)
+                            confidence_raw = pred_probs[class_idx]
+                            
+                            # Refine prediction based on negation and sarcasm rules
+                            pred_class, confidence, rule_triggered, rule_msg = refine_sentiment(
+                                user_input, pred_class_raw, confidence_raw
+                            )
                             
                             # Show Result Card
                             st.markdown("#### Hasil Analisis")
                             
-                            # Color coding based on sentiment
+                            # Color coding based on sentiment with Cortisol Theme
                             if pred_class == 'Positive':
-                                sentiment_html = f"<span class='sentiment-positive'>🟢 {pred_class}</span>"
+                                sentiment_html = f"<span class='sentiment-positive'>🟢 Low Cortisol (Relaxed / Stress-Free)</span>"
                             elif pred_class == 'Neutral':
-                                sentiment_html = f"<span class='sentiment-neutral'>🟡 {pred_class}</span>"
+                                sentiment_html = f"<span class='sentiment-neutral'>🟡 Normal Cortisol (Steady)</span>"
                             else:
-                                sentiment_html = f"<span class='sentiment-negative'>🔴 {pred_class}</span>"
+                                sentiment_html = f"<span class='sentiment-negative'>🔴 High Cortisol (Stressed / Alert)</span>"
                                 
-                            st.markdown(f"""
-                            <div class='card'>
-                                <h5>Hasil Prediksi Sentimen:</h5>
-                                {sentiment_html}
-                                <br><br>
-                                <h5>Skor Keyakinan (Confidence Score):</h5>
-                                <h3>{confidence * 100:.2f}%</h3>
-                            </div>
-                            """, unsafe_allow_html=True)
+                            rule_html = ""
+                            if rule_triggered:
+                                rule_html = f"<p style='color:#e67e22; font-size:0.9rem; margin-top:0.5rem;'>⚠️ <b>Rule-Based Refiner</b>: {rule_msg}</p>"
+                                
+                            st.markdown(f"""<div class='card'>
+<h5>Hasil Analisis Cortisol:</h5>
+{sentiment_html}
+{rule_html}
+<br>
+<h5>Skor Keyakinan (Confidence Score):</h5>
+<h3>{confidence * 100:.2f}%</h3>
+</div>""", unsafe_allow_html=True)
+                            
+                            # Video rendering (Discord MP4 Proxies with Autoplay & Loop)
+                            if pred_class == 'Positive':
+                                st.markdown("##### Agnes Tachyon wishes you Low Cortisol 🐎")
+                                st.video(
+                                    "https://images-ext-1.discordapp.net/external/l7KB5jD97ZZELMXPDOnGaRxbnnBeOY6c7HYI20qFBSI/https/static.klipy.com/ii/6b3a6ab13999af763b4db87b91ee67d0/28/2f/eAzsnFzVPianrKxOF.mp4",
+                                    autoplay=True, loop=True, muted=True
+                                )
+                            elif pred_class == 'Neutral':
+                                st.markdown("##### Asa Mitaka maintains Medium Cortisol 👩")
+                                st.video(
+                                    "https://images-ext-1.discordapp.net/external/VcM-y_VaayrQ7rieQNjJBoEEC-FjI1_19myQKqsmVIY/https/static.klipy.com/ii/4493325008d34b7bf8cd6813cd5c1619/a9/a3/vVz6B1NI5PGOrsP.mp4",
+                                    autoplay=True, loop=True, muted=True
+                                )
+                            else:
+                                st.warning("🚨 Cortisol Anda terdeteksi sangat tinggi! Redakan stres Anda dengan menonton tarian Tamamo Cross berikut:")
+                                st.video(
+                                    "https://images-ext-1.discordapp.net/external/4C1NfuWBSxmd0G-Rn03Yqb2SlQsRZxKx62SGyGh3TN0/https/static.klipy.com/ii/4493325008d34b7bf8cd6813cd5c1619/9c/26/cZuQPPiyiT17ueqYeWX.mp4",
+                                    autoplay=True, loop=True, muted=True
+                                )
                             
                             # Sarcasm Check
                             if detect_sarcasm(user_input):
@@ -304,11 +332,24 @@ else:
                         tfidf_batch = vectorizer.transform(clean_texts)
                         
                         # Predict
-                        predictions = model.predict(tfidf_batch)
+                        raw_predictions = model.predict(tfidf_batch)
                         probabilities = model.predict_proba(tfidf_batch)
-                        
-                        max_probs = [max(prob) for prob in probabilities]
-                        
+                         
+                        predictions = []
+                        max_probs = []
+                         
+                        # Apply Refiner on Batch predictions
+                        for i, orig_text in enumerate(df_batch[text_col]):
+                            raw_pred = raw_predictions[i]
+                            class_idx = list(model.classes_).index(raw_pred)
+                            raw_conf = probabilities[i][class_idx]
+                             
+                            refined_pred, refined_conf, _, _ = refine_sentiment(
+                                str(orig_text), raw_pred, raw_conf
+                            )
+                            predictions.append(refined_pred)
+                            max_probs.append(refined_conf)
+                         
                         df_batch['Cleaned_Text'] = clean_texts
                         df_batch['Predicted_Sentiment'] = predictions
                         df_batch['Confidence_Score'] = max_probs
