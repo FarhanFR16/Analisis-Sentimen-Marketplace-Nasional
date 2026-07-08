@@ -5,7 +5,7 @@ import pickle
 
 # Add src directory to path
 sys.path.append(os.path.dirname(__file__))
-from preprocess import TextPreprocessor
+from preprocess import TextPreprocessor, refine_sentiment
 from api import app
 from fastapi.testclient import TestClient
 
@@ -84,6 +84,22 @@ class TestSentimentPipeline(unittest.TestCase):
             response = client.post("/predict", json=payload)
             self.assertEqual(response.status_code, 400)
             self.assertEqual(response.json()["detail"]["status"], "error")
+
+    def test_refine_sentiment_negation(self):
+        """Test that refine_sentiment overrides positive SVM predictions when negations are present."""
+        # e.g., SVM predicts Positive but text has 'tidak membantu'
+        pred, conf, triggered, msg = refine_sentiment("barang ini sangat tidak membantu", "Positive", 0.85)
+        self.assertEqual(pred, "Negative")
+        self.assertTrue(triggered)
+        self.assertIn("tidak membantu", msg.lower())
+
+    def test_refine_sentiment_sarcasm(self):
+        """Test that refine_sentiment overrides positive SVM predictions when sarcasm/contradiction is present."""
+        # e.g., SVM predicts Positive but text has 'bagus tapi langsung mati'
+        pred, conf, triggered, msg = refine_sentiment("bagus sih tapi sayang layarnya mati total", "Positive", 0.90)
+        self.assertEqual(pred, "Negative")
+        self.assertTrue(triggered)
+        self.assertIn("sarkasme", msg.lower())
 
 if __name__ == "__main__":
     unittest.main()
